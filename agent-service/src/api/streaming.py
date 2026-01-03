@@ -1,0 +1,119 @@
+import json
+import asyncio
+from typing import AsyncGenerator
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+
+from ..models.api_models import AgentRequest
+from ..models.state import GraphState
+from ..graph.workflow import create_graph
+
+
+async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
+    """Stream events as the agent system processes the task."""
+
+    # Initial event
+    yield f"data: {json.dumps({'type': 'started', 'message': 'Starting multi-agent system...'})}\n\n"
+    await asyncio.sleep(0.1)
+
+    # Planning phase
+    yield f"data: {json.dumps({'type': 'thinking', 'message': 'Supervisor is analyzing the task and creating a plan...'})}\n\n"
+    await asyncio.sleep(0.1)
+
+    # Create initial state
+    import uuid
+    run_id = str(uuid.uuid4())
+
+    initial_state: GraphState = {
+        "supervisor": {
+            "task_id": run_id,
+            "context_id": None,
+            "status": "RUNNING",
+            "plan": [],
+            "history": [],
+            "notes": task,
+        },
+        "agent": {
+            "messages": [],
+            "tool_events": [],
+            "recursion_depth": 0,
+            "scratchpad": {},
+        },
+    }
+
+    graph = create_graph()
+    config = {"configurable": {"thread_id": run_id}}
+
+    # Stream the graph execution
+    step_count = 0
+    async for event in graph.astream(initial_state, config):
+        step_count += 1
+
+        # Parse the event
+        if isinstance(event, dict):
+            for node_name, node_output in event.items():
+                if node_name == "supervisor":
+                    supervisor_state = node_output.get("supervisor", {})
+                    plan = supervisor_state.get("plan", [])
+
+                    if plan:
+                        plan_data = {
+                            'type': 'plan_created',
+                            'message': f'Plan created with {len(plan)} tasks',
+                            'plan': plan
+                        }
+                        yield f"data: {json.dumps(plan_data)}\n\n"
+
+                    active_agent = supervisor_state.get("active_agent")
+                    if active_agent:
+                        routing_data = {
+                            'type': 'routing',
+                            'message': f'Routing to {active_agent}...',
+                            'agent': active_agent
+                        }
+                        yield f"data: {json.dumps(routing_data)}\n\n"
+
+                elif node_name == "research_agent":
+                    yield f"data: {json.dumps({'type': 'agent_working', 'message': 'Research agent is gathering information...', 'agent': 'research_agent'})}\n\n"
+
+                    supervisor_state = node_output.get("supervisor", {})
+                    history = supervisor_state.get("history", [])
+                    if history:
+                        last_summary = history[-1]
+                        summary_text = last_summary.get("short_summary", "")
+                        event_data = {
+                            'type': 'agent_completed',
+                            'message': f'Research agent completed: {summary_text}',
+                            'agent': 'research_agent',
+                            'summary': last_summary
+                        }
+                        yield f"data: {json.dumps(event_data)}\n\n"
+
+                elif node_name == "transform_agent":
+                    yield f"data: {json.dumps({'type': 'agent_working', 'message': 'Transform agent is processing data...', 'agent': 'transform_agent'})}\n\n"
+
+                    supervisor_state = node_output.get("supervisor", {})
+                    history = supervisor_state.get("history", [])
+                    if history:
+                        last_summary = history[-1]
+                        summary_text = last_summary.get("short_summary", "")
+                        event_data = {
+                            'type': 'agent_completed',
+                            'message': f'Transform agent completed: {summary_text}',
+                            'agent': 'transform_agent',
+                            'summary': last_summary
+                        }
+                        yield f"data: {json.dumps(event_data)}\n\n"
+
+                elif node_name == "finalizer":
+                    supervisor_state = node_output.get("supervisor", {})
+                    notes = supervisor_state.get("notes", "")
+                    yield f"data: {json.dumps({'type': 'finalizing', 'message': 'Finalizing response...'})}\n\n"
+
+        await asyncio.sleep(0.1)
+
+    # Get final result
+    final_state = await graph.ainvoke(initial_state, config)
+
+    # Send final event
+    yield f"data: {json.dumps({'type': 'done', 'message': 'Task completed!', 'result': {'status': final_state['supervisor']['status'], 'output': final_state['supervisor'].get('notes', ''), 'supervisor_state': final_state['supervisor']}})}\n\n"
