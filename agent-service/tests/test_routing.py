@@ -1,6 +1,5 @@
-import pytest
+from src.graph.workflow import route_after_agent, route_after_supervisor
 from src.models.state import GraphState
-from src.graph.workflow import route_after_supervisor, route_after_agent
 
 
 def test_route_to_finalizer_when_done():

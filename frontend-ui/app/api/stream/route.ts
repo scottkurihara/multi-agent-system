@@ -7,10 +7,10 @@ export async function POST(req: NextRequest) {
   const { task } = body;
 
   if (!task) {
-    return new Response(
-      JSON.stringify({ error: 'Task is required' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: 'Task is required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   try {
@@ -27,10 +27,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (!response.ok) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to connect to agent service' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Failed to connect to agent service' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     // Forward the streaming response
@@ -38,14 +38,14 @@ export async function POST(req: NextRequest) {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        Connection: 'keep-alive',
       },
     });
   } catch (error: any) {
     console.error('Streaming error:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }

@@ -9,7 +9,12 @@ interface ApprovalCardProps {
   onResponse: (option: string) => void;
 }
 
-export default function ApprovalCard({ title, description, options, onResponse }: ApprovalCardProps) {
+export default function ApprovalCard({
+  title,
+  description,
+  options,
+  onResponse,
+}: ApprovalCardProps) {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
   const handleSelect = (option: string) => {
@@ -30,7 +35,9 @@ export default function ApprovalCard({ title, description, options, onResponse }
             style={{
               ...styles.button,
               ...(selectedOption === option ? styles.buttonSelected : {}),
-              ...(selectedOption !== null && selectedOption !== option ? styles.buttonDisabled : {}),
+              ...(selectedOption !== null && selectedOption !== option
+                ? styles.buttonDisabled
+                : {}),
             }}
           >
             {option}

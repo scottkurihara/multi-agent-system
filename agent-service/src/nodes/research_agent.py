@@ -1,9 +1,11 @@
 import json
 import re
 import uuid
+
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
-from ..models.state import GraphState, AgentSummary
+
+from ..models.state import AgentSummary, GraphState
 from .ui_tools import UI_TOOLS
 
 RESEARCH_AGENT_PROMPT = """You are a Research Agent with UI capabilities. Your job is to:
@@ -39,7 +41,8 @@ async def research_agent_node(state: GraphState) -> dict:
     ).bind_tools(UI_TOOLS)
 
     my_tasks = [
-        todo for todo in state["supervisor"].get("plan", [])
+        todo
+        for todo in state["supervisor"].get("plan", [])
         if todo.get("owner_agent") == "research_agent" and todo.get("status") == "PENDING"
     ]
 
@@ -66,10 +69,12 @@ async def research_agent_node(state: GraphState) -> dict:
         }
 
     current_task = my_tasks[0]
-    history_summary = "\n".join([
-        f"- {h['agent_name']}: {h['short_summary']}"
-        for h in state["supervisor"].get("history", [])
-    ])
+    history_summary = "\n".join(
+        [
+            f"- {h['agent_name']}: {h['short_summary']}"
+            for h in state["supervisor"].get("history", [])
+        ]
+    )
 
     task_description = f"""Task: {current_task['description']}
 
@@ -89,7 +94,7 @@ Complete this task and provide a summary."""
     response = await llm.ainvoke(messages)
 
     # Check if agent is calling a UI tool
-    if hasattr(response, 'tool_calls') and response.tool_calls:
+    if hasattr(response, "tool_calls") and response.tool_calls:
         tool_call = response.tool_calls[0]
         # Store tool call in state for streaming to pick up
         return {
@@ -100,16 +105,19 @@ Complete this task and provide a summary."""
                     "tool": tool_call["name"],
                     "args": tool_call["args"],
                     "tool_call_id": tool_call.get("id", str(uuid.uuid4())),
-                }
+                },
             },
             "agent": {
                 **state["agent"],
-                "tool_events": state["agent"].get("tool_events", []) + [{
-                    "type": "tool_call",
-                    "agent": "research_agent",
-                    "tool": tool_call["name"],
-                    "args": tool_call["args"],
-                }],
+                "tool_events": state["agent"].get("tool_events", [])
+                + [
+                    {
+                        "type": "tool_call",
+                        "agent": "research_agent",
+                        "tool": tool_call["name"],
+                        "args": tool_call["args"],
+                    }
+                ],
                 "recursion_depth": state["agent"]["recursion_depth"] + 1,
             },
         }
@@ -119,7 +127,7 @@ Complete this task and provide a summary."""
     try:
         summary = json.loads(content)
     except json.JSONDecodeError:
-        json_match = re.search(r'\{[\s\S]*\}', content)
+        json_match = re.search(r"\{[\s\S]*\}", content)
         if json_match:
             summary = json.loads(json_match.group(0))
         else:

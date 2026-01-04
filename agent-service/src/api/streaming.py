@@ -1,12 +1,9 @@
-import json
 import asyncio
-from typing import AsyncGenerator
-from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+import json
+from collections.abc import AsyncGenerator
 
-from ..models.api_models import AgentRequest
-from ..models.state import GraphState
 from ..graph.workflow import create_graph
+from ..models.state import GraphState
 
 
 async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
@@ -22,6 +19,7 @@ async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
 
     # Create initial state
     import uuid
+
     run_id = str(uuid.uuid4())
 
     initial_state: GraphState = {
@@ -58,18 +56,18 @@ async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
 
                     if plan:
                         plan_data = {
-                            'type': 'plan_created',
-                            'message': f'Plan created with {len(plan)} tasks',
-                            'plan': plan
+                            "type": "plan_created",
+                            "message": f"Plan created with {len(plan)} tasks",
+                            "plan": plan,
                         }
                         yield f"data: {json.dumps(plan_data)}\n\n"
 
                     active_agent = supervisor_state.get("active_agent")
                     if active_agent:
                         routing_data = {
-                            'type': 'routing',
-                            'message': f'Routing to {active_agent}...',
-                            'agent': active_agent
+                            "type": "routing",
+                            "message": f"Routing to {active_agent}...",
+                            "agent": active_agent,
                         }
                         yield f"data: {json.dumps(routing_data)}\n\n"
 
@@ -82,12 +80,12 @@ async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
                     pending_tool_call = supervisor_state.get("pending_tool_call")
                     if pending_tool_call:
                         tool_call_data = {
-                            'type': 'tool_call',
-                            'message': f'Research agent is showing UI component: {pending_tool_call["tool"]}',
-                            'agent': pending_tool_call.get('agent', 'research_agent'),
-                            'tool': pending_tool_call['tool'],
-                            'args': pending_tool_call['args'],
-                            'tool_call_id': pending_tool_call.get('tool_call_id')
+                            "type": "tool_call",
+                            "message": f'Research agent is showing UI component: {pending_tool_call["tool"]}',
+                            "agent": pending_tool_call.get("agent", "research_agent"),
+                            "tool": pending_tool_call["tool"],
+                            "args": pending_tool_call["args"],
+                            "tool_call_id": pending_tool_call.get("tool_call_id"),
                         }
                         yield f"data: {json.dumps(tool_call_data)}\n\n"
 
@@ -96,10 +94,10 @@ async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
                         last_summary = history[-1]
                         summary_text = last_summary.get("short_summary", "")
                         event_data = {
-                            'type': 'agent_completed',
-                            'message': f'Research agent completed: {summary_text}',
-                            'agent': 'research_agent',
-                            'summary': last_summary
+                            "type": "agent_completed",
+                            "message": f"Research agent completed: {summary_text}",
+                            "agent": "research_agent",
+                            "summary": last_summary,
                         }
                         yield f"data: {json.dumps(event_data)}\n\n"
 
@@ -112,12 +110,12 @@ async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
                     pending_tool_call = supervisor_state.get("pending_tool_call")
                     if pending_tool_call:
                         tool_call_data = {
-                            'type': 'tool_call',
-                            'message': f'Transform agent is showing UI component: {pending_tool_call["tool"]}',
-                            'agent': pending_tool_call.get('agent', 'transform_agent'),
-                            'tool': pending_tool_call['tool'],
-                            'args': pending_tool_call['args'],
-                            'tool_call_id': pending_tool_call.get('tool_call_id')
+                            "type": "tool_call",
+                            "message": f'Transform agent is showing UI component: {pending_tool_call["tool"]}',
+                            "agent": pending_tool_call.get("agent", "transform_agent"),
+                            "tool": pending_tool_call["tool"],
+                            "args": pending_tool_call["args"],
+                            "tool_call_id": pending_tool_call.get("tool_call_id"),
                         }
                         yield f"data: {json.dumps(tool_call_data)}\n\n"
 
@@ -126,16 +124,14 @@ async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
                         last_summary = history[-1]
                         summary_text = last_summary.get("short_summary", "")
                         event_data = {
-                            'type': 'agent_completed',
-                            'message': f'Transform agent completed: {summary_text}',
-                            'agent': 'transform_agent',
-                            'summary': last_summary
+                            "type": "agent_completed",
+                            "message": f"Transform agent completed: {summary_text}",
+                            "agent": "transform_agent",
+                            "summary": last_summary,
                         }
                         yield f"data: {json.dumps(event_data)}\n\n"
 
                 elif node_name == "finalizer":
-                    supervisor_state = node_output.get("supervisor", {})
-                    notes = supervisor_state.get("notes", "")
                     yield f"data: {json.dumps({'type': 'finalizing', 'message': 'Finalizing response...'})}\n\n"
 
         await asyncio.sleep(0.1)

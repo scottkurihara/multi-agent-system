@@ -1,20 +1,13 @@
 import os
 import uuid
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse
-from dotenv import load_dotenv
 
-from ..models.api_models import (
-    AgentRequest,
-    AgentResponse,
-    ErrorResponse,
-    OutputData,
-    ResultData,
-    Metadata,
-    ErrorDetail,
-)
-from ..models.state import GraphState
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
+
 from ..graph.workflow import create_graph
+from ..models.api_models import AgentRequest, AgentResponse, Metadata, OutputData, ResultData
+from ..models.state import GraphState
 from .streaming import stream_agent_events
 
 # Load environment variables
@@ -57,17 +50,15 @@ async def run_agent(request: AgentRequest) -> AgentResponse:
             if request.options and request.options.run_id
             else str(uuid.uuid4())
         )
-        system_variant = (
-            request.options.system_variant
-            if request.options
-            else "blue"
-        )
+        system_variant = request.options.system_variant if request.options else "blue"
 
         # Initialize state
         initial_state: GraphState = {
             "supervisor": {
                 "task_id": run_id,
-                "context_id": request.input.context.get("context_id") if request.input.context else None,
+                "context_id": request.input.context.get("context_id")
+                if request.input.context
+                else None,
                 "status": "RUNNING",
                 "plan": [],
                 "history": [],
@@ -112,7 +103,9 @@ async def run_agent(request: AgentRequest) -> AgentResponse:
                 "error": {
                     "code": "INTERNAL_ERROR",
                     "message": str(e),
-                    "details": {"stack": str(e) if os.getenv("NODE_ENV") == "development" else None},
+                    "details": {
+                        "stack": str(e) if os.getenv("NODE_ENV") == "development" else None
+                    },
                 }
             },
         )

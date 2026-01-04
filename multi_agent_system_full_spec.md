@@ -122,7 +122,7 @@ Middleware intercepts agent execution steps to enforce policies, safety checks, 
 - **Logic**:
   ```ts
   const MAX_RECURSION_LIMIT = 5; // Configurable
-  
+
   function checkRecursionLimit(state: AgentState): AgentState {
     if (state.recursion_depth > MAX_RECURSION_LIMIT) {
       throw new Error("RECURSION_LIMIT_EXCEEDED: Agent exceeded max allowed consecutive tool calls.");
@@ -362,12 +362,12 @@ Service name: `prompt-library-service`
 
 # 🔟 PROHIBITED BEHAVIOR
 
-❌ implicit routing via LLM output  
-❌ inline long prompts post-Phase 3  
-❌ storing non-serializables in state  
-❌ modifying SupervisorState from agents  
-❌ silent failures on missing prompts  
-❌ infinite tool recursion (enforced by middleware)  
+❌ implicit routing via LLM output
+❌ inline long prompts post-Phase 3
+❌ storing non-serializables in state
+❌ modifying SupervisorState from agents
+❌ silent failures on missing prompts
+❌ infinite tool recursion (enforced by middleware)
 
 ---
 

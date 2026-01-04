@@ -1,6 +1,7 @@
-from typing import Literal, TypedDict, Annotated
-from langchain_core.messages import BaseMessage
 import operator
+from typing import Annotated, Literal, TypedDict
+
+from langchain_core.messages import BaseMessage
 
 # Type aliases
 Status = Literal["RUNNING", "DONE", "ESCALATE"]

@@ -9,7 +9,12 @@ interface EditableValueProps {
   onSave: (newValue: string) => void;
 }
 
-export default function EditableValue({ label, value, field_type = 'text', onSave }: EditableValueProps) {
+export default function EditableValue({
+  label,
+  value,
+  field_type = 'text',
+  onSave,
+}: EditableValueProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [currentValue, setCurrentValue] = useState(value);
   const [savedValue, setSavedValue] = useState(value);

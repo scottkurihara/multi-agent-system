@@ -45,10 +45,12 @@ export default function Home() {
     setTask(''); // Clear input immediately
     setLoading(true);
     setError(null);
-    setEvents([{
-      type: 'user_message',
-      message: userTask,
-    }]);
+    setEvents([
+      {
+        type: 'user_message',
+        message: userTask,
+      },
+    ]);
     setFinalResult(null);
 
     try {
@@ -103,31 +105,51 @@ export default function Home() {
 
   const getEventIcon = (type: string) => {
     switch (type) {
-      case 'started': return '🚀';
-      case 'thinking': return '🤔';
-      case 'plan_created': return '📋';
-      case 'routing': return '🔄';
-      case 'agent_working': return '⚙️';
-      case 'agent_completed': return '✅';
-      case 'tool_call': return '🎨';
-      case 'finalizing': return '🎯';
-      case 'done': return '🎉';
-      default: return '•';
+      case 'started':
+        return '🚀';
+      case 'thinking':
+        return '🤔';
+      case 'plan_created':
+        return '📋';
+      case 'routing':
+        return '🔄';
+      case 'agent_working':
+        return '⚙️';
+      case 'agent_completed':
+        return '✅';
+      case 'tool_call':
+        return '🎨';
+      case 'finalizing':
+        return '🎯';
+      case 'done':
+        return '🎉';
+      default:
+        return '•';
     }
   };
 
   const getEventColor = (type: string) => {
     switch (type) {
-      case 'started': return '#3b82f6';
-      case 'thinking': return '#8b5cf6';
-      case 'plan_created': return '#10b981';
-      case 'routing': return '#f59e0b';
-      case 'agent_working': return '#06b6d4';
-      case 'agent_completed': return '#059669';
-      case 'tool_call': return '#8b5cf6';
-      case 'finalizing': return '#ec4899';
-      case 'done': return '#10b981';
-      default: return '#6b7280';
+      case 'started':
+        return '#3b82f6';
+      case 'thinking':
+        return '#8b5cf6';
+      case 'plan_created':
+        return '#10b981';
+      case 'routing':
+        return '#f59e0b';
+      case 'agent_working':
+        return '#06b6d4';
+      case 'agent_completed':
+        return '#059669';
+      case 'tool_call':
+        return '#8b5cf6';
+      case 'finalizing':
+        return '#ec4899';
+      case 'done':
+        return '#10b981';
+      default:
+        return '#6b7280';
     }
   };
 
@@ -183,12 +205,7 @@ export default function Home() {
           />
         );
       case 'show_research_summary':
-        return (
-          <ResearchSummary
-            title={event.args.title}
-            findings={event.args.findings}
-          />
-        );
+        return <ResearchSummary title={event.args.title} findings={event.args.findings} />;
       default:
         return null;
     }
@@ -215,16 +232,20 @@ export default function Home() {
 
           {events.map((event, idx) => {
             const isToolCall = event.type === 'tool_call';
-            const isSystemMessage = ['started', 'thinking', 'routing', 'agent_working', 'finalizing'].includes(event.type);
+            const isSystemMessage = [
+              'started',
+              'thinking',
+              'routing',
+              'agent_working',
+              'finalizing',
+            ].includes(event.type);
             const isResult = event.type === 'done';
             const isUserMessage = event.type === 'user_message';
 
             if (isUserMessage) {
               return (
                 <div key={idx} style={styles.userMessage}>
-                  <div style={styles.userBubble}>
-                    {event.message}
-                  </div>
+                  <div style={styles.userBubble}>{event.message}</div>
                   <div style={styles.userAvatar}>👤</div>
                 </div>
               );
@@ -328,9 +349,7 @@ export default function Home() {
               {loading ? '⏳' : '📤'}
             </button>
           </form>
-          <div style={styles.inputHint}>
-            Press Enter to send, Shift+Enter for new line
-          </div>
+          <div style={styles.inputHint}>Press Enter to send, Shift+Enter for new line</div>
         </div>
       </div>
     </main>
@@ -343,7 +362,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     background: '#f5f5f5',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    fontFamily:
+      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
     overflow: 'hidden',
   },
   chatContainer: {

@@ -1,4 +1,3 @@
-import pytest
 from src.models.state import ToDo
 
 

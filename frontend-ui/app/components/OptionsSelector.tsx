@@ -28,7 +28,9 @@ export default function OptionsSelector({ question, options, onSelect }: Options
             style={{
               ...styles.option,
               ...(selectedOption === option ? styles.optionSelected : {}),
-              ...(selectedOption !== null && selectedOption !== option ? styles.optionDisabled : {}),
+              ...(selectedOption !== null && selectedOption !== option
+                ? styles.optionDisabled
+                : {}),
             }}
           >
             <span style={styles.optionNumber}>{idx + 1}</span>

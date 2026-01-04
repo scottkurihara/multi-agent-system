@@ -1,7 +1,9 @@
 import json
 import re
+
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
+
 from ..models.state import GraphState
 
 SUPERVISOR_PROMPT = """You are the Supervisor in a multi-agent system. Your role is to:
@@ -70,7 +72,7 @@ Update the plan and decide the next agent to route to, or set active_agent to nu
     try:
         parsed = json.loads(content)
     except json.JSONDecodeError:
-        json_match = re.search(r'\{[\s\S]*\}', content)
+        json_match = re.search(r"\{[\s\S]*\}", content)
         if json_match:
             parsed = json.loads(json_match.group(0))
         else:

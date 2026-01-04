@@ -1,7 +1,7 @@
 """Main entry point for the agent service."""
 import os
-import uvicorn
 
+import uvicorn
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8080"))

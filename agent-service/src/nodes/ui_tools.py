@@ -7,22 +7,16 @@ UI_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "Title of the approval card"
-                },
-                "description": {
-                    "type": "string",
-                    "description": "Description or content to show"
-                },
+                "title": {"type": "string", "description": "Title of the approval card"},
+                "description": {"type": "string", "description": "Description or content to show"},
                 "options": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "List of action options (e.g., ['Approve', 'Edit', 'Reject'])"
-                }
+                    "description": "List of action options (e.g., ['Approve', 'Edit', 'Reject'])",
+                },
             },
-            "required": ["title", "description", "options"]
-        }
+            "required": ["title", "description", "options"],
+        },
     },
     {
         "name": "show_editable_value",
@@ -30,22 +24,16 @@ UI_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "label": {
-                    "type": "string",
-                    "description": "Label for the field"
-                },
-                "value": {
-                    "type": "string",
-                    "description": "Current value"
-                },
+                "label": {"type": "string", "description": "Label for the field"},
+                "value": {"type": "string", "description": "Current value"},
                 "field_type": {
                     "type": "string",
                     "enum": ["text", "number", "date"],
-                    "description": "Type of input field"
-                }
+                    "description": "Type of input field",
+                },
             },
-            "required": ["label", "value"]
-        }
+            "required": ["label", "value"],
+        },
     },
     {
         "name": "show_document",
@@ -53,21 +41,12 @@ UI_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "Document title"
-                },
-                "content": {
-                    "type": "string",
-                    "description": "Main content to display"
-                },
-                "metadata": {
-                    "type": "object",
-                    "description": "Optional metadata key-value pairs"
-                }
+                "title": {"type": "string", "description": "Document title"},
+                "content": {"type": "string", "description": "Main content to display"},
+                "metadata": {"type": "object", "description": "Optional metadata key-value pairs"},
             },
-            "required": ["title", "content"]
-        }
+            "required": ["title", "content"],
+        },
     },
     {
         "name": "show_options",
@@ -75,18 +54,15 @@ UI_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "question": {
-                    "type": "string",
-                    "description": "The question to ask"
-                },
+                "question": {"type": "string", "description": "The question to ask"},
                 "options": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "List of options to choose from"
-                }
+                    "description": "List of options to choose from",
+                },
             },
-            "required": ["question", "options"]
-        }
+            "required": ["question", "options"],
+        },
     },
     {
         "name": "show_research_summary",
@@ -94,17 +70,14 @@ UI_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "Summary title"
-                },
+                "title": {"type": "string", "description": "Summary title"},
                 "findings": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Key findings or insights"
-                }
+                    "description": "Key findings or insights",
+                },
             },
-            "required": ["title", "findings"]
-        }
-    }
+            "required": ["title", "findings"],
+        },
+    },
 ]
