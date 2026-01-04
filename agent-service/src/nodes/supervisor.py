@@ -41,13 +41,14 @@ async def supervisor_node(state: GraphState) -> dict:
     )
 
     is_initial_planning = len(state["supervisor"].get("plan", [])) == 0
+    history = state["supervisor"].get("history", [])
 
-    if is_initial_planning:
+    if is_initial_planning or not history:
         user_message = f"""User task: {state['supervisor'].get('notes', 'No task provided')}
 
 Please create a plan to accomplish this task. Break it into ToDo items and assign them to appropriate agents."""
     else:
-        last_summary = state["supervisor"]["history"][-1]
+        last_summary = history[-1]
         current_plan = json.dumps(state["supervisor"]["plan"], indent=2)
 
         user_message = f"""Current plan:
@@ -71,12 +72,12 @@ Update the plan and decide the next agent to route to, or set active_agent to nu
 
     try:
         parsed = json.loads(content)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
         json_match = re.search(r"\{[\s\S]*\}", content)
         if json_match:
             parsed = json.loads(json_match.group(0))
         else:
-            raise ValueError("Supervisor failed to output valid JSON")
+            raise ValueError("Supervisor failed to output valid JSON") from e
 
     updated_plan = parsed.get("plan", state["supervisor"].get("plan", []))
     active_agent = parsed.get("active_agent")
