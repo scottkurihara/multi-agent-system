@@ -1,10 +1,13 @@
 import json
+import logging
 import re
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from ..models.state import GraphState
+
+logger = logging.getLogger(__name__)
 
 SUPERVISOR_PROMPT = """You are the Supervisor in a multi-agent system. Your role is to:
 1. Break down user tasks into actionable ToDo items
@@ -35,6 +38,9 @@ If all work is complete, set active_agent to null to trigger finalization."""
 
 
 async def supervisor_node(state: GraphState) -> dict:
+    logger.info("Supervisor node started")
+    logger.debug(f"Supervisor state: {state['supervisor'].get('status')}")
+
     llm = ChatAnthropic(
         model="claude-3-5-haiku-20241022",
         temperature=0,
@@ -44,10 +50,12 @@ async def supervisor_node(state: GraphState) -> dict:
     history = state["supervisor"].get("history", [])
 
     if is_initial_planning or not history:
+        logger.info("Initial planning phase - creating new plan")
         user_message = f"""User task: {state['supervisor'].get('notes', 'No task provided')}
 
 Please create a plan to accomplish this task. Break it into ToDo items and assign them to appropriate agents."""
     else:
+        logger.info(f"Re-planning phase - {len(history)} history entries")
         last_summary = history[-1]
         current_plan = json.dumps(state["supervisor"]["plan"], indent=2)
 
@@ -69,18 +77,26 @@ Update the plan and decide the next agent to route to, or set active_agent to nu
 
     response = await llm.ainvoke(messages)
     content = response.content
+    logger.debug(f"Supervisor response length: {len(content)} chars")
 
     try:
         parsed = json.loads(content)
+        logger.debug("Successfully parsed supervisor JSON response")
     except json.JSONDecodeError as e:
+        logger.warning("Failed to parse JSON, attempting regex extraction")
         json_match = re.search(r"\{[\s\S]*\}", content)
         if json_match:
             parsed = json.loads(json_match.group(0))
+            logger.info("Successfully extracted JSON via regex")
         else:
+            logger.error("Supervisor failed to output valid JSON")
             raise ValueError("Supervisor failed to output valid JSON") from e
 
     updated_plan = parsed.get("plan", state["supervisor"].get("plan", []))
     active_agent = parsed.get("active_agent")
+
+    logger.info(f"Supervisor routing to: {active_agent or 'FINALIZER'}")
+    logger.info(f"Plan has {len(updated_plan)} tasks")
 
     return {
         "supervisor": {

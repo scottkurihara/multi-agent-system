@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 import uuid
 
@@ -7,6 +8,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from ..models.state import AgentSummary, GraphState
 from .ui_tools import UI_TOOLS
+
+logger = logging.getLogger(__name__)
 
 RESEARCH_AGENT_PROMPT = """You are a Research Agent with UI capabilities. Your job is to:
 1. Analyze the assigned ToDo task
@@ -35,6 +38,8 @@ After completing your task, output JSON in this format:
 
 
 async def research_agent_node(state: GraphState) -> dict:
+    logger.info("Research agent node started")
+
     llm = ChatAnthropic(
         model="claude-3-5-haiku-20241022",
         temperature=0.7,
@@ -46,7 +51,10 @@ async def research_agent_node(state: GraphState) -> dict:
         if todo.get("owner_agent") == "research_agent" and todo.get("status") == "PENDING"
     ]
 
+    logger.info(f"Research agent found {len(my_tasks)} pending tasks")
+
     if not my_tasks:
+        logger.warning("Research agent has no pending tasks, returning immediately")
         summary: AgentSummary = {
             "agent_name": "research_agent",
             "step_id": str(uuid.uuid4()),
@@ -69,6 +77,8 @@ async def research_agent_node(state: GraphState) -> dict:
         }
 
     current_task = my_tasks[0]
+    logger.debug(f"Processing task: {current_task['description']}")
+
     history_summary = "\n".join(
         [
             f"- {h['agent_name']}: {h['short_summary']}"
@@ -91,10 +101,12 @@ Complete this task and provide a summary."""
         HumanMessage(content=task_description),
     ]
 
+    logger.info("Invoking research agent LLM")
     response = await llm.ainvoke(messages)
 
     # Check if agent is calling a UI tool
     if hasattr(response, "tool_calls") and response.tool_calls:
+        logger.info(f"Research agent calling UI tool: {response.tool_calls[0]['name']}")
         tool_call = response.tool_calls[0]
         # Store tool call in state for streaming to pick up
         return {

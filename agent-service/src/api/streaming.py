@@ -1,13 +1,17 @@
 import asyncio
 import json
+import logging
 from collections.abc import AsyncGenerator
 
 from ..graph.workflow import create_graph
 from ..models.state import GraphState
 
+logger = logging.getLogger(__name__)
+
 
 async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
     """Stream events as the agent system processes the task."""
+    logger.info(f"Starting stream for task: {task[:50]}...")
 
     # Initial event
     yield f"data: {json.dumps({'type': 'started', 'message': 'Starting multi-agent system...'})}\n\n"
@@ -21,6 +25,7 @@ async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
     import uuid
 
     run_id = str(uuid.uuid4())
+    logger.info(f"Created run ID: {run_id}")
 
     initial_state: GraphState = {
         "supervisor": {
@@ -45,8 +50,10 @@ async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
     # Stream the graph execution
     step_count = 0
     final_state = None
+    logger.info("Starting graph stream execution")
     async for event in graph.astream(initial_state, config):
         step_count += 1
+        logger.debug(f"Processing step {step_count}")
 
         # Parse the event
         if isinstance(event, dict):
@@ -84,6 +91,7 @@ async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
                     # Check for tool calls
                     pending_tool_call = supervisor_state.get("pending_tool_call")
                     if pending_tool_call:
+                        logger.info(f"Streaming tool call: {pending_tool_call['tool']}")
                         tool_call_data = {
                             "type": "tool_call",
                             "message": f'Research agent is showing UI component: {pending_tool_call["tool"]}',
@@ -142,9 +150,12 @@ async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
         await asyncio.sleep(0.1)
 
     # Send final event using the captured state
+    logger.info(f"Stream completed after {step_count} steps")
     if final_state and "supervisor" in final_state:
         supervisor_final = final_state["supervisor"]
+        logger.info(f"Final status: {supervisor_final['status']}")
         yield f"data: {json.dumps({'type': 'done', 'message': 'Task completed!', 'result': {'status': supervisor_final['status'], 'output': supervisor_final.get('notes', ''), 'supervisor_state': supervisor_final}})}\n\n"
     else:
         # Fallback if no state was captured
+        logger.warning("No final state captured, using fallback")
         yield f"data: {json.dumps({'type': 'done', 'message': 'Task completed!', 'result': {'status': 'DONE', 'output': '', 'supervisor_state': {}}})}\n\n"

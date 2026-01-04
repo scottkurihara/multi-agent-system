@@ -1,3 +1,4 @@
+import logging
 import os
 import uuid
 
@@ -8,21 +9,32 @@ from fastapi.responses import StreamingResponse
 from ..graph.workflow import create_graph
 from ..models.api_models import AgentRequest, AgentResponse, Metadata, OutputData, ResultData
 from ..models.state import GraphState
+from ..utils.logging_config import setup_logging
 from .streaming import stream_agent_events
 
 # Load environment variables
 load_dotenv()
 
+# Setup logging
+log_level = os.getenv("LOG_LEVEL", "INFO")
+log_file = os.getenv("LOG_FILE", None)
+setup_logging(log_level=log_level, log_file=log_file)
+
+logger = logging.getLogger(__name__)
+logger.info(f"Starting Agent Service with log level: {log_level}")
+
 app = FastAPI(title="Agent Service", version="1.0.0")
 
 # Create the graph
 graph = create_graph()
+logger.info("Agent graph created successfully")
 
 
 @app.post("/v1/agent/run")
 async def run_agent(request: AgentRequest) -> AgentResponse:
     """Run the multi-agent system."""
     try:
+        logger.info(f"Received agent run request: {request.input.task[:50]}...")
         if not request.input.task:
             raise HTTPException(
                 status_code=400,
@@ -108,7 +120,7 @@ async def run_agent(request: AgentRequest) -> AgentResponse:
                     },
                 }
             },
-        )
+        ) from e
 
 
 @app.get("/health")
@@ -121,6 +133,7 @@ async def health_check():
 async def stream_agent(request: AgentRequest):
     """Stream agent execution events in real-time."""
     try:
+        logger.info(f"Received stream request: {request.input.task[:50]}...")
         if not request.input.task:
             raise HTTPException(
                 status_code=400,
@@ -153,7 +166,7 @@ async def stream_agent(request: AgentRequest):
                     "message": str(e),
                 }
             },
-        )
+        ) from e
 
 
 if __name__ == "__main__":

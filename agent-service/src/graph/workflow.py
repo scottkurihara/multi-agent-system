@@ -1,3 +1,5 @@
+import logging
+
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
@@ -7,31 +9,39 @@ from ..nodes.research_agent import research_agent_node
 from ..nodes.supervisor import supervisor_node
 from ..nodes.transform_agent import transform_agent_node
 
+logger = logging.getLogger(__name__)
+
 
 def route_after_supervisor(state: GraphState) -> str:
     """Route after supervisor node based on status and active_agent."""
     status = state["supervisor"].get("status")
 
     if status == "DONE":
+        logger.debug("Routing to finalizer (status=DONE)")
         return "finalizer"
 
     if status == "ESCALATE":
+        logger.warning("Routing to hitl_escalation (status=ESCALATE)")
         return "hitl_escalation"
 
     active_agent = state["supervisor"].get("active_agent")
     if active_agent:
+        logger.info(f"Routing to {active_agent}")
         return active_agent
 
+    logger.debug("Routing back to supervisor")
     return "supervisor"
 
 
 def route_after_agent(state: GraphState) -> str:
     """Route back to supervisor after agent execution."""
+    logger.debug("Agent completed, routing back to supervisor")
     return "supervisor"
 
 
 def create_graph():
     """Create and compile the LangGraph workflow."""
+    logger.info("Creating agent workflow graph")
     workflow = StateGraph(GraphState)
 
     # Add nodes
@@ -39,6 +49,9 @@ def create_graph():
     workflow.add_node("research_agent", research_agent_node)
     workflow.add_node("transform_agent", transform_agent_node)
     workflow.add_node("finalizer", finalizer_node)
+    logger.debug(
+        "Added 4 nodes to workflow: supervisor, research_agent, transform_agent, finalizer"
+    )
 
     # Set entry point
     workflow.set_entry_point("supervisor")
@@ -75,5 +88,6 @@ def create_graph():
     # Compile with checkpointer
     checkpointer = MemorySaver()
     app = workflow.compile(checkpointer=checkpointer)
+    logger.info("Workflow graph compiled successfully")
 
     return app
