@@ -44,12 +44,17 @@ async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
 
     # Stream the graph execution
     step_count = 0
+    final_state = None
     async for event in graph.astream(initial_state, config):
         step_count += 1
 
         # Parse the event
         if isinstance(event, dict):
             for node_name, node_output in event.items():
+                # Capture the final state from each event
+                if "supervisor" in node_output:
+                    final_state = node_output
+
                 if node_name == "supervisor":
                     supervisor_state = node_output.get("supervisor", {})
                     plan = supervisor_state.get("plan", [])
@@ -136,8 +141,10 @@ async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
 
         await asyncio.sleep(0.1)
 
-    # Get final result
-    final_state = await graph.ainvoke(initial_state, config)
-
-    # Send final event
-    yield f"data: {json.dumps({'type': 'done', 'message': 'Task completed!', 'result': {'status': final_state['supervisor']['status'], 'output': final_state['supervisor'].get('notes', ''), 'supervisor_state': final_state['supervisor']}})}\n\n"
+    # Send final event using the captured state
+    if final_state and "supervisor" in final_state:
+        supervisor_final = final_state["supervisor"]
+        yield f"data: {json.dumps({'type': 'done', 'message': 'Task completed!', 'result': {'status': supervisor_final['status'], 'output': supervisor_final.get('notes', ''), 'supervisor_state': supervisor_final}})}\n\n"
+    else:
+        # Fallback if no state was captured
+        yield f"data: {json.dumps({'type': 'done', 'message': 'Task completed!', 'result': {'status': 'DONE', 'output': '', 'supervisor_state': {}}})}\n\n"
