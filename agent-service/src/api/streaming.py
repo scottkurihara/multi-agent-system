@@ -77,6 +77,20 @@ async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
                     yield f"data: {json.dumps({'type': 'agent_working', 'message': 'Research agent is gathering information...', 'agent': 'research_agent'})}\n\n"
 
                     supervisor_state = node_output.get("supervisor", {})
+
+                    # Check for tool calls
+                    pending_tool_call = supervisor_state.get("pending_tool_call")
+                    if pending_tool_call:
+                        tool_call_data = {
+                            'type': 'tool_call',
+                            'message': f'Research agent is showing UI component: {pending_tool_call["tool"]}',
+                            'agent': pending_tool_call.get('agent', 'research_agent'),
+                            'tool': pending_tool_call['tool'],
+                            'args': pending_tool_call['args'],
+                            'tool_call_id': pending_tool_call.get('tool_call_id')
+                        }
+                        yield f"data: {json.dumps(tool_call_data)}\n\n"
+
                     history = supervisor_state.get("history", [])
                     if history:
                         last_summary = history[-1]
@@ -93,6 +107,20 @@ async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
                     yield f"data: {json.dumps({'type': 'agent_working', 'message': 'Transform agent is processing data...', 'agent': 'transform_agent'})}\n\n"
 
                     supervisor_state = node_output.get("supervisor", {})
+
+                    # Check for tool calls
+                    pending_tool_call = supervisor_state.get("pending_tool_call")
+                    if pending_tool_call:
+                        tool_call_data = {
+                            'type': 'tool_call',
+                            'message': f'Transform agent is showing UI component: {pending_tool_call["tool"]}',
+                            'agent': pending_tool_call.get('agent', 'transform_agent'),
+                            'tool': pending_tool_call['tool'],
+                            'args': pending_tool_call['args'],
+                            'tool_call_id': pending_tool_call.get('tool_call_id')
+                        }
+                        yield f"data: {json.dumps(tool_call_data)}\n\n"
+
                     history = supervisor_state.get("history", [])
                     if history:
                         last_summary = history[-1]

@@ -4,13 +4,23 @@ import uuid
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 from ..models.state import GraphState, AgentSummary
+from .ui_tools import UI_TOOLS
 
-TRANSFORM_AGENT_PROMPT = """You are a Transform Agent. Your job is to:
+TRANSFORM_AGENT_PROMPT = """You are a Transform Agent with UI capabilities. Your job is to:
 1. Analyze the assigned ToDo task
 2. Transform, process, or manipulate data as requested
-3. Return a structured summary
+3. Show interactive UI components to the user when approval or input is needed
+4. Return a structured summary
 
-You MUST output JSON in this exact format:
+You have access to UI tools:
+- show_approval_card: Show options for user to approve/edit/reject
+- show_editable_value: Let user edit a value
+- show_document: Display formatted content
+- show_options: Show multiple choice options
+
+Use these tools when you need user input or approval for your work.
+
+After completing your task, output JSON in this format:
 {
   "agent_name": "transform_agent",
   "step_id": "uuid",
@@ -25,7 +35,7 @@ async def transform_agent_node(state: GraphState) -> dict:
     llm = ChatAnthropic(
         model="claude-3-5-haiku-20241022",
         temperature=0.7,
-    )
+    ).bind_tools(UI_TOOLS)
 
     my_tasks = [
         todo for todo in state["supervisor"].get("plan", [])
@@ -76,6 +86,33 @@ Complete this task and provide a summary."""
     ]
 
     response = await llm.ainvoke(messages)
+
+    # Check if agent is calling a UI tool
+    if hasattr(response, 'tool_calls') and response.tool_calls:
+        tool_call = response.tool_calls[0]
+        # Store tool call in state for streaming to pick up
+        return {
+            "supervisor": {
+                **state["supervisor"],
+                "pending_tool_call": {
+                    "agent": "transform_agent",
+                    "tool": tool_call["name"],
+                    "args": tool_call["args"],
+                    "tool_call_id": tool_call.get("id", str(uuid.uuid4())),
+                }
+            },
+            "agent": {
+                **state["agent"],
+                "tool_events": state["agent"].get("tool_events", []) + [{
+                    "type": "tool_call",
+                    "agent": "transform_agent",
+                    "tool": tool_call["name"],
+                    "args": tool_call["args"],
+                }],
+                "recursion_depth": state["agent"]["recursion_depth"] + 1,
+            },
+        }
+
     content = response.content
 
     try:
