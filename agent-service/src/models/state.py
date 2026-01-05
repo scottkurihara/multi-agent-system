@@ -35,6 +35,7 @@ class SupervisorState(TypedDict, total=False):
     history: list[AgentSummary]
     active_agent: str
     notes: str
+    tool_results: list[dict]
 
 
 class AgentState(TypedDict):
