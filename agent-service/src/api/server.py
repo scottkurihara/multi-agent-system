@@ -11,6 +11,7 @@ from ..graph.workflow import create_graph
 from ..models.api_models import AgentRequest, AgentResponse, Metadata, OutputData, ResultData
 from ..models.state import GraphState
 from ..utils.logging_config import setup_logging
+from .ai_todos import router as ai_todos_router
 from .streaming import stream_agent_events
 from .todos import router as todos_router
 
@@ -29,6 +30,7 @@ app = FastAPI(title="Agent Service", version="1.0.0")
 
 # Include routers
 app.include_router(todos_router)
+app.include_router(ai_todos_router)
 
 # Create the graph
 graph = create_graph()
