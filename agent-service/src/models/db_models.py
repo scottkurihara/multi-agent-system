@@ -62,7 +62,7 @@ class UserTodo(Base):
 
     # Metadata
     tags: Mapped[Optional[list]] = mapped_column(JSON)
-    metadata: Mapped[Optional[dict]] = mapped_column(JSON)
+    extra_data: Mapped[Optional[dict]] = mapped_column(JSON)  # Additional metadata
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
