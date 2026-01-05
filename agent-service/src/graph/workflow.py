@@ -5,9 +5,7 @@ from langgraph.graph import END, StateGraph
 
 from ..models.state import GraphState
 from ..nodes.finalizer import finalizer_node
-from ..nodes.research_agent import research_agent_node
 from ..nodes.supervisor import supervisor_node
-from ..nodes.transform_agent import transform_agent_node
 
 logger = logging.getLogger(__name__)
 
@@ -46,12 +44,8 @@ def create_graph():
 
     # Add nodes
     workflow.add_node("supervisor", supervisor_node)
-    workflow.add_node("research_agent", research_agent_node)
-    workflow.add_node("transform_agent", transform_agent_node)
     workflow.add_node("finalizer", finalizer_node)
-    logger.debug(
-        "Added 4 nodes to workflow: supervisor, research_agent, transform_agent, finalizer"
-    )
+    logger.debug("Added 2 nodes to workflow: supervisor, finalizer")
 
     # Set entry point
     workflow.set_entry_point("supervisor")
@@ -62,24 +56,9 @@ def create_graph():
         route_after_supervisor,
         {
             "supervisor": "supervisor",
-            "research_agent": "research_agent",
-            "transform_agent": "transform_agent",
             "finalizer": "finalizer",
             "hitl_escalation": END,
         },
-    )
-
-    # Add conditional edges from agents back to supervisor
-    workflow.add_conditional_edges(
-        "research_agent",
-        route_after_agent,
-        {"supervisor": "supervisor"},
-    )
-
-    workflow.add_conditional_edges(
-        "transform_agent",
-        route_after_agent,
-        {"supervisor": "supervisor"},
     )
 
     # Finalizer goes to END

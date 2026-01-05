@@ -6,11 +6,13 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 
+from ..database import init_db
 from ..graph.workflow import create_graph
 from ..models.api_models import AgentRequest, AgentResponse, Metadata, OutputData, ResultData
 from ..models.state import GraphState
 from ..utils.logging_config import setup_logging
 from .streaming import stream_agent_events
+from .todos import router as todos_router
 
 # Load environment variables
 load_dotenv()
@@ -25,9 +27,20 @@ logger.info(f"Starting Agent Service with log level: {log_level}")
 
 app = FastAPI(title="Agent Service", version="1.0.0")
 
+# Include routers
+app.include_router(todos_router)
+
 # Create the graph
 graph = create_graph()
 logger.info("Agent graph created successfully")
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database on startup."""
+    logger.info("Running startup tasks...")
+    await init_db()
+    logger.info("Startup tasks completed")
 
 
 @app.post("/v1/agent/run")
