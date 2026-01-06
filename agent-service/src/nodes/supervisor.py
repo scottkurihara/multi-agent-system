@@ -1,182 +1,167 @@
-import json
+"""Supervisor Agent - Orchestrates sub-agents and manages task execution.
+
+This agent uses create_react_agent from LangGraph and calls sub-agents as tools.
+The supervisor is responsible for:
+1. Understanding user requests
+2. Delegating work to specialist sub-agents (research, transform)
+3. Managing todo operations
+4. Coordinating the overall workflow
+"""
+
 import logging
-import re
 
 from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langgraph.prebuilt import create_react_agent
 
 from ..models.state import GraphState
 from .agent_tools import breakdown_task, generate_task_guidance, prioritize_tasks, schedule_task
+from .sub_agent_tools import call_research_agent, call_transform_agent
 
 logger = logging.getLogger(__name__)
 
-SUPERVISOR_PROMPT = """You are the Supervisor in an AI-powered to-do management system. Your role is to:
-1. Understand user requests about their to-dos
-2. Help users manage tasks using available tools
-3. Provide intelligent assistance for task breakdown, prioritization, scheduling, and guidance
+SUPERVISOR_SYSTEM_MESSAGE = """You are the Supervisor Agent in a multi-agent system.
 
-You have access to these specialized tools:
-- breakdown_task: Break down complex tasks into smaller, manageable subtasks with time estimates
-- prioritize_tasks: Analyze multiple tasks and suggest priorities based on urgency and importance
-- schedule_task: Suggest optimal scheduling for a task based on duration, deadline, and constraints
-- generate_task_guidance: Provide step-by-step instructions and tips for completing a task
+Your responsibilities:
+1. Understand user requests and break them down into steps
+2. Delegate work to specialist sub-agents when needed
+3. Manage todo operations (breakdown, prioritize, schedule, guide)
+4. Coordinate the overall workflow
 
-When a user asks to:
-- "Break down X" or "Split X into subtasks" → call breakdown_task
-- "Prioritize my tasks" or "What should I do first?" → call prioritize_tasks
-- "Schedule X" or "When should I do X?" → call schedule_task
-- "How do I do X?" or "Guide me through X" → call generate_task_guidance
+## Available Sub-Agents (call as tools):
 
-You can call multiple tools in sequence as needed. Always confirm actions with the user and explain the results in a clear, helpful manner.
+**call_research_agent**: Delegate research tasks
+- Use for: information gathering, data analysis, topic research
+- Example: "Research the latest developments in AI"
 
-IMPORTANT: When you're done processing and have provided a final response to the user, output JSON in this format:
-{
-  "plan": [{"id": "uuid", "description": "task description", "status": "DONE"}],
-  "active_agent": null,
-  "notes": "your final response to the user"
-}
+**call_transform_agent**: Delegate transformation tasks
+- Use for: data formatting, summarization, restructuring, entity extraction
+- Example: "Summarize this research and format as markdown"
 
-This signals completion of the request."""
+## Available Todo Management Tools:
+
+**breakdown_task**: Break down complex tasks into subtasks with time estimates
+**prioritize_tasks**: Analyze and suggest task priorities
+**schedule_task**: Suggest optimal task scheduling
+**generate_task_guidance**: Provide step-by-step task completion guidance
+
+## Workflow:
+
+1. Analyze the user's request
+2. Determine if sub-agents are needed:
+   - Research needed? → call_research_agent
+   - Transformation needed? → call_transform_agent
+3. Use todo management tools for task organization
+4. Provide clear, helpful responses
+
+You can call multiple tools in sequence. Delegate complex work to sub-agents rather than trying to do everything yourself."""
 
 
-async def supervisor_node(state: GraphState) -> dict:
-    logger.info("Supervisor node started")
-    logger.debug(f"Supervisor state: {state['supervisor'].get('status')}")
+# Create the supervisor agent using create_react_agent
+def create_supervisor_agent():
+    """Create the supervisor agent using LangGraph's create_react_agent.
 
-    # Initialize LLM with tools
+    The supervisor has access to:
+    - Sub-agent tools (call_research_agent, call_transform_agent)
+    - Todo management tools (breakdown_task, prioritize_tasks, etc.)
+
+    Returns:
+        A configured supervisor agent
+    """
     llm = ChatAnthropic(
-        model="claude-3-5-haiku-20241022",
+        model="claude-3-5-sonnet-20241022",
         temperature=0,
     )
 
-    # Bind tools to LLM
+    # Combine all available tools
     tools = [
+        # Sub-agent tools
+        call_research_agent,
+        call_transform_agent,
+        # Todo management tools
         breakdown_task,
         prioritize_tasks,
         schedule_task,
         generate_task_guidance,
     ]
-    llm_with_tools = llm.bind_tools(tools)
 
-    is_initial_planning = len(state["supervisor"].get("plan", [])) == 0
+    # create_react_agent doesn't take state_modifier, we'll add system message in messages
+    agent = create_react_agent(
+        llm,
+        tools=tools,
+    )
+
+    logger.info("Supervisor agent created successfully with access to sub-agents and todo tools")
+    return agent
+
+
+# Create the supervisor agent instance
+supervisor_agent = create_supervisor_agent()
+
+
+async def supervisor_node(state: GraphState) -> dict:
+    """Node function that wraps the supervisor agent for use in LangGraph.
+
+    Args:
+        state: Graph state containing supervisor and agent states
+
+    Returns:
+        Updated state with supervisor's decisions and routing
+    """
+    logger.info("Supervisor node started")
+    logger.debug(f"Supervisor status: {state['supervisor'].get('status')}")
+
+    # Get the user's task/request
+    user_task = state["supervisor"].get("notes", "")
     history = state["supervisor"].get("history", [])
-    tool_results = state["supervisor"].get("tool_results", [])
 
-    # Build message list
-    messages = [SystemMessage(content=SUPERVISOR_PROMPT)]
-
-    if is_initial_planning or not history:
-        logger.info("Initial planning phase - processing user request")
-        user_message = f"""User request: {state['supervisor'].get('notes', 'No task provided')}
-
-Please help the user with their request using the available tools if needed, or respond directly."""
-        messages.append(HumanMessage(content=user_message))
+    # Build the message for the supervisor
+    if not history:
+        # Initial planning
+        logger.info("Initial planning phase")
+        message = f"User request: {user_task}"
     else:
-        logger.info(f"Re-planning phase - {len(history)} history entries")
+        # Re-planning after sub-agent execution
+        logger.info(f"Re-planning phase with {len(history)} history entries")
         last_summary = history[-1]
-        current_plan = json.dumps(state["supervisor"]["plan"], indent=2)
+        message = f"""User request: {user_task}
 
-        user_message = f"""Current plan:
-{current_plan}
-
-Last agent update:
-- Agent: {last_summary['agent_name']}
+Latest update from {last_summary['agent_name']}:
 - Result: {last_summary['result']}
 - Summary: {last_summary['short_summary']}
-- Next instructions: {last_summary['next_instructions_for_supervisor']}
+- Instructions: {last_summary['next_instructions_for_supervisor']}
 
-Continue processing or finalize."""
-        messages.append(HumanMessage(content=user_message))
+Please continue processing or finalize if complete."""
 
-    # Add tool results to message history if any
-    if tool_results:
-        for tool_result in tool_results:
-            messages.append(AIMessage(content="", tool_calls=[tool_result["call"]]))
-            messages.append(
-                ToolMessage(
-                    content=json.dumps(tool_result["result"]),
-                    tool_call_id=tool_result["call"]["id"],
-                )
-            )
+    try:
+        # Invoke the supervisor agent with system message
+        result = await supervisor_agent.ainvoke(
+            {"messages": [("system", SUPERVISOR_SYSTEM_MESSAGE), ("human", message)]}
+        )
 
-    # Invoke LLM
-    response = await llm_with_tools.ainvoke(messages)
-    logger.debug(f"Supervisor response: {response}")
+        # Extract the final response
+        messages = result.get("messages", [])
+        final_message = messages[-1] if messages else None
 
-    # Check if there are tool calls
-    if hasattr(response, "tool_calls") and response.tool_calls:
-        logger.info(f"Supervisor requested {len(response.tool_calls)} tool calls")
+        logger.info("Supervisor agent completed successfully")
+        logger.debug(f"Supervisor generated {len(messages)} messages")
 
-        # Execute tool calls
-        new_tool_results = []
-        for tool_call in response.tool_calls:
-            tool_name = tool_call["name"]
-            tool_args = tool_call["args"]
-            logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
-
-            # Find and execute the tool
-            tool_map = {
-                "breakdown_task": breakdown_task,
-                "prioritize_tasks": prioritize_tasks,
-                "schedule_task": schedule_task,
-                "generate_task_guidance": generate_task_guidance,
-            }
-
-            if tool_name in tool_map:
-                try:
-                    result = await tool_map[tool_name].ainvoke(tool_args)
-                    logger.info(f"Tool {tool_name} executed successfully")
-                    new_tool_results.append({"call": tool_call, "result": result})
-                except Exception as e:
-                    logger.error(f"Tool {tool_name} failed: {e}")
-                    new_tool_results.append(
-                        {
-                            "call": tool_call,
-                            "result": {"error": str(e)},
-                        }
-                    )
-            else:
-                logger.warning(f"Unknown tool: {tool_name}")
-
-        # Update state with tool results and continue processing
+        # For now, mark as DONE after supervisor processes
+        # In a full implementation, you'd parse the response to determine next steps
         return {
             "supervisor": {
                 **state["supervisor"],
-                "tool_results": new_tool_results,
-                "status": "RUNNING",  # Continue looping to process results
+                "status": "DONE",
+                "active_agent": None,
+                "notes": final_message.content if final_message else "Processing complete",
             }
         }
 
-    # No tool calls - parse final JSON response
-    content = response.content
-    logger.debug(f"Supervisor response length: {len(content)} chars")
-
-    try:
-        parsed = json.loads(content)
-        logger.debug("Successfully parsed supervisor JSON response")
-    except json.JSONDecodeError as e:
-        logger.warning("Failed to parse JSON, attempting regex extraction")
-        json_match = re.search(r"\{[\s\S]*\}", content)
-        if json_match:
-            parsed = json.loads(json_match.group(0))
-            logger.info("Successfully extracted JSON via regex")
-        else:
-            logger.error("Supervisor failed to output valid JSON")
-            raise ValueError("Supervisor failed to output valid JSON") from e
-
-    updated_plan = parsed.get("plan", state["supervisor"].get("plan", []))
-    active_agent = parsed.get("active_agent")
-
-    logger.info(f"Supervisor routing to: {active_agent or 'FINALIZER'}")
-    logger.info(f"Plan has {len(updated_plan)} tasks")
-
-    return {
-        "supervisor": {
-            **state["supervisor"],
-            "plan": updated_plan,
-            "active_agent": active_agent if active_agent else None,
-            "notes": parsed.get("notes", state["supervisor"].get("notes")),
-            "status": "DONE" if active_agent is None else "RUNNING",
-            "tool_results": [],  # Clear tool results after processing
+    except Exception as e:
+        logger.error(f"Supervisor agent failed: {e}")
+        return {
+            "supervisor": {
+                **state["supervisor"],
+                "status": "ESCALATE",
+                "notes": f"Supervisor encountered an error: {str(e)}",
+            }
         }
-    }
