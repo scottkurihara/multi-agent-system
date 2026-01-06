@@ -7,6 +7,7 @@ import {
   DocumentViewer,
   OptionsSelector,
   ResearchSummary,
+  TodoManager,
 } from './components';
 
 interface StreamEvent {
@@ -27,6 +28,7 @@ export default function Home() {
   const [finalResult, setFinalResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showTodoManager, setShowTodoManager] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -213,146 +215,161 @@ export default function Home() {
 
   return (
     <main style={styles.main}>
-      <div style={styles.chatContainer}>
-        {/* Header */}
-        <div style={styles.header}>
-          <div style={styles.headerDecor}></div>
-          <h1 style={styles.title}>Multi-Agent System</h1>
-          <p style={styles.subtitle}>[ AI agents working together ]</p>
-        </div>
-
-        {/* Messages Area */}
-        <div style={styles.messagesArea}>
-          {events.length === 0 && !finalResult && (
-            <div style={styles.emptyState}>
-              <div style={styles.emptyIcon}>💬</div>
-              <p style={styles.emptyText}>Start a conversation with the multi-agent system</p>
-              <p style={styles.emptyHint}>Ask a question or describe a task below</p>
+      {showTodoManager ? (
+        <TodoManager onClose={() => setShowTodoManager(false)} />
+      ) : (
+        <div style={styles.chatContainer}>
+          {/* Header */}
+          <div style={styles.header}>
+            <div style={styles.headerDecor}></div>
+            <div style={styles.headerContent}>
+              <div>
+                <h1 style={styles.title}>Multi-Agent System</h1>
+                <p style={styles.subtitle}>[ AI agents working together ]</p>
+              </div>
+              <button
+                onClick={() => setShowTodoManager(true)}
+                style={styles.todoButton}
+                title="Open Task Manager"
+              >
+                📋
+              </button>
             </div>
-          )}
+          </div>
 
-          {events.map((event, idx) => {
-            const isToolCall = event.type === 'tool_call';
-            const isSystemMessage = [
-              'started',
-              'thinking',
-              'routing',
-              'agent_working',
-              'finalizing',
-            ].includes(event.type);
-            const isResult = event.type === 'done';
-            const isUserMessage = event.type === 'user_message';
+          {/* Messages Area */}
+          <div style={styles.messagesArea}>
+            {events.length === 0 && !finalResult && (
+              <div style={styles.emptyState}>
+                <div style={styles.emptyIcon}>💬</div>
+                <p style={styles.emptyText}>Start a conversation with the multi-agent system</p>
+                <p style={styles.emptyHint}>Ask a question or describe a task below</p>
+              </div>
+            )}
 
-            if (isUserMessage) {
-              return (
-                <div key={idx} style={styles.userMessage}>
-                  <div style={styles.userBubble}>{event.message}</div>
-                  <div style={styles.userAvatar}>👤</div>
-                </div>
-              );
-            }
+            {events.map((event, idx) => {
+              const isToolCall = event.type === 'tool_call';
+              const isSystemMessage = [
+                'started',
+                'thinking',
+                'routing',
+                'agent_working',
+                'finalizing',
+              ].includes(event.type);
+              const isResult = event.type === 'done';
+              const isUserMessage = event.type === 'user_message';
 
-            if (isToolCall) {
-              return (
-                <div key={idx} style={styles.toolCallMessage}>
-                  {renderToolCall(event)}
-                </div>
-              );
-            }
+              if (isUserMessage) {
+                return (
+                  <div key={idx} style={styles.userMessage}>
+                    <div style={styles.userBubble}>{event.message}</div>
+                    <div style={styles.userAvatar}>👤</div>
+                  </div>
+                );
+              }
 
-            if (isSystemMessage) {
-              return (
-                <div key={idx} style={styles.systemMessage}>
-                  <span style={styles.systemIcon}>{getEventIcon(event.type)}</span>
-                  <span style={styles.systemText}>{event.message}</span>
-                </div>
-              );
-            }
+              if (isToolCall) {
+                return (
+                  <div key={idx} style={styles.toolCallMessage}>
+                    {renderToolCall(event)}
+                  </div>
+                );
+              }
 
-            if (event.type === 'plan_created') {
-              return (
-                <div key={idx} style={styles.agentMessage}>
-                  <div style={styles.agentAvatar}>📋</div>
-                  <div style={styles.agentBubble}>
-                    <div style={styles.agentName}>Supervisor</div>
-                    <div style={styles.agentText}>
-                      Created a plan with {event.plan?.length || 0} tasks
+              if (isSystemMessage) {
+                return (
+                  <div key={idx} style={styles.systemMessage}>
+                    <span style={styles.systemIcon}>{getEventIcon(event.type)}</span>
+                    <span style={styles.systemText}>{event.message}</span>
+                  </div>
+                );
+              }
+
+              if (event.type === 'plan_created') {
+                return (
+                  <div key={idx} style={styles.agentMessage}>
+                    <div style={styles.agentAvatar}>📋</div>
+                    <div style={styles.agentBubble}>
+                      <div style={styles.agentName}>Supervisor</div>
+                      <div style={styles.agentText}>
+                        Created a plan with {event.plan?.length || 0} tasks
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            }
+                );
+              }
 
-            if (event.type === 'agent_completed' && event.summary) {
-              return (
-                <div key={idx} style={styles.agentMessage}>
-                  <div style={styles.agentAvatar}>
-                    {event.agent === 'research_agent' ? '🔍' : '⚙️'}
-                  </div>
-                  <div style={styles.agentBubble}>
-                    <div style={styles.agentName}>
-                      {event.agent === 'research_agent' ? 'Research Agent' : 'Transform Agent'}
+              if (event.type === 'agent_completed' && event.summary) {
+                return (
+                  <div key={idx} style={styles.agentMessage}>
+                    <div style={styles.agentAvatar}>
+                      {event.agent === 'research_agent' ? '🔍' : '⚙️'}
                     </div>
-                    <div style={styles.agentText}>{event.summary.short_summary}</div>
+                    <div style={styles.agentBubble}>
+                      <div style={styles.agentName}>
+                        {event.agent === 'research_agent' ? 'Research Agent' : 'Transform Agent'}
+                      </div>
+                      <div style={styles.agentText}>{event.summary.short_summary}</div>
+                    </div>
                   </div>
-                </div>
-              );
-            }
+                );
+              }
 
-            if (isResult && event.result) {
-              return (
-                <div key={idx} style={styles.finalMessage}>
-                  <div style={styles.finalIcon}>🎉</div>
-                  <div style={styles.finalContent}>
-                    <div style={styles.finalTitle}>Task Completed</div>
-                    <div style={styles.finalText}>{event.result.output}</div>
+              if (isResult && event.result) {
+                return (
+                  <div key={idx} style={styles.finalMessage}>
+                    <div style={styles.finalIcon}>🎉</div>
+                    <div style={styles.finalContent}>
+                      <div style={styles.finalTitle}>Task Completed</div>
+                      <div style={styles.finalText}>{event.result.output}</div>
+                    </div>
                   </div>
-                </div>
-              );
-            }
+                );
+              }
 
-            return null;
-          })}
+              return null;
+            })}
 
-          {error && (
-            <div style={styles.errorMessage}>
-              <strong>Error:</strong> {error}
-            </div>
-          )}
-          <div ref={messagesEndRef} />
+            {error && (
+              <div style={styles.errorMessage}>
+                <strong>Error:</strong> {error}
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input Area at Bottom */}
+          <div style={styles.inputArea}>
+            <form onSubmit={handleSubmit} style={styles.inputForm}>
+              <textarea
+                value={task}
+                onChange={(e) => setTask(e.target.value)}
+                placeholder="Ask a question or describe your task..."
+                style={styles.input}
+                rows={1}
+                disabled={loading}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(e);
+                  }
+                }}
+              />
+              <button
+                type="submit"
+                disabled={loading || !task.trim()}
+                style={{
+                  ...styles.sendButton,
+                  ...(loading || !task.trim() ? styles.sendButtonDisabled : {}),
+                }}
+              >
+                {loading ? '⏳' : '📤'}
+              </button>
+            </form>
+            <div style={styles.inputHint}>Press Enter to send, Shift+Enter for new line</div>
+          </div>
         </div>
-
-        {/* Input Area at Bottom */}
-        <div style={styles.inputArea}>
-          <form onSubmit={handleSubmit} style={styles.inputForm}>
-            <textarea
-              value={task}
-              onChange={(e) => setTask(e.target.value)}
-              placeholder="Ask a question or describe your task..."
-              style={styles.input}
-              rows={1}
-              disabled={loading}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit(e);
-                }
-              }}
-            />
-            <button
-              type="submit"
-              disabled={loading || !task.trim()}
-              style={{
-                ...styles.sendButton,
-                ...(loading || !task.trim() ? styles.sendButtonDisabled : {}),
-              }}
-            >
-              {loading ? '⏳' : '📤'}
-            </button>
-          </form>
-          <div style={styles.inputHint}>Press Enter to send, Shift+Enter for new line</div>
-        </div>
-      </div>
+      )}
     </main>
   );
 }
@@ -386,6 +403,26 @@ const styles: Record<string, React.CSSProperties> = {
     backdropFilter: 'blur(10px)',
     position: 'relative',
     overflow: 'hidden',
+  },
+  headerContent: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    position: 'relative',
+    zIndex: 2,
+  },
+  todoButton: {
+    width: '56px',
+    height: '56px',
+    fontSize: '1.75rem',
+    background: 'rgba(0, 245, 212, 0.1)',
+    border: '2px solid rgba(0, 245, 212, 0.3)',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    clipPath: 'polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%)',
   },
   title: {
     fontSize: '2.5rem',

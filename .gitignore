@@ -32,8 +32,11 @@ Thumbs.db
 
 # Testing
 .coverage
+coverage/
 htmlcov/
 .pytest_cache/
+coverage.json
+coverage-summary.json
 
 # Python
 *.egg-info/
