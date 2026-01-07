@@ -72,7 +72,7 @@ def _todo_to_response(todo: UserTodo) -> UserTodoResponse:
         scheduled_for=todo.scheduled_for.isoformat() if todo.scheduled_for else None,
         estimated_duration=todo.estimated_duration,
         tags=todo.tags,
-        metadata=todo.metadata,
+        metadata=todo.extra_data,  # DB model uses extra_data, API uses metadata
         created_at=todo.created_at.isoformat(),
         updated_at=todo.updated_at.isoformat(),
         completed_at=todo.completed_at.isoformat() if todo.completed_at else None,

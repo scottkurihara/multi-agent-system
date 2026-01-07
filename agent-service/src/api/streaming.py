@@ -11,7 +11,12 @@ logger = logging.getLogger(__name__)
 
 async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
     """Stream events as the agent system processes the task."""
+    from ..nodes.agent_tools import reset_tool_tracking
+
     logger.info(f"Starting stream for task: {task[:50]}...")
+
+    # Reset tool call tracking for this session
+    reset_tool_tracking()
 
     # Initial event
     yield f"data: {json.dumps({'type': 'started', 'message': 'Starting multi-agent system...'})}\n\n"
@@ -45,15 +50,23 @@ async def stream_agent_events(task: str) -> AsyncGenerator[str, None]:
     }
 
     graph = create_graph()
-    config = {"configurable": {"thread_id": run_id}}
+    config = {
+        "configurable": {"thread_id": run_id},
+        "recursion_limit": 30,  # Safety limit - agent should stop much sooner
+    }
 
     # Stream the graph execution
     step_count = 0
     final_state = None
     logger.info("Starting graph stream execution")
+    logger.info(f"Config: recursion_limit={config.get('recursion_limit', 25)}")
+
     async for event in graph.astream(initial_state, config):
         step_count += 1
-        logger.debug(f"Processing step {step_count}")
+        logger.info(f"Step {step_count}: Processing event")
+        logger.debug(
+            f"Event keys: {list(event.keys()) if isinstance(event, dict) else type(event)}"
+        )
 
         # Parse the event
         if isinstance(event, dict):

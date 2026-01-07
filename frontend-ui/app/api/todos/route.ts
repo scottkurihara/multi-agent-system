@@ -17,7 +17,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(data, { status: response.status });
     }
 
-    return NextResponse.json(data);
+    // Backend returns array directly, wrap it for frontend
+    return NextResponse.json({ todos: data });
   } catch (error: any) {
     console.error('Error fetching todos:', error);
     return NextResponse.json(
