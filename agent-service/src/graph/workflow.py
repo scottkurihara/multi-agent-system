@@ -24,8 +24,14 @@ def route_after_supervisor(state: GraphState) -> str:
 
     active_agent = state["supervisor"].get("active_agent")
     if active_agent:
-        logger.info(f"Routing to {active_agent}")
-        return active_agent
+        # Validate that the active_agent is a valid route
+        # In the refactored architecture, sub-agents are called as tools,
+        # not as separate nodes, so active_agent should always be None
+        logger.warning(
+            f"Active agent '{active_agent}' requested but sub-agents are now tools. "
+            "Routing to finalizer instead."
+        )
+        return "finalizer"
 
     logger.debug("Routing back to supervisor")
     return "supervisor"

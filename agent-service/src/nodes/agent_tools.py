@@ -6,6 +6,7 @@ prioritization, scheduling, and step-by-step guidance.
 
 import json
 import logging
+from collections import defaultdict
 from typing import Any
 
 from langchain_anthropic import ChatAnthropic
@@ -13,6 +14,37 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
+
+# Tool call tracking to detect loops
+_tool_call_counts = defaultdict(int)
+MAX_TOOL_CALLS = 3  # Maximum times a tool can be called in one session
+
+
+def track_tool_call(tool_name: str) -> bool:
+    """Track tool calls and return False if limit exceeded.
+
+    Returns:
+        True if call is allowed, False if limit exceeded
+    """
+    _tool_call_counts[tool_name] += 1
+    count = _tool_call_counts[tool_name]
+
+    logger.info(f"Tool '{tool_name}' called {count} time(s)")
+
+    if count > MAX_TOOL_CALLS:
+        logger.warning(
+            f"Tool '{tool_name}' exceeded call limit ({MAX_TOOL_CALLS}). "
+            f"This may indicate an infinite loop."
+        )
+        return False
+
+    return True
+
+
+def reset_tool_tracking():
+    """Reset tool call tracking (call at start of new session)."""
+    _tool_call_counts.clear()
+    logger.debug("Tool call tracking reset")
 
 
 # Initialize LLM for tool use
@@ -334,6 +366,144 @@ Make the guidance practical, specific, and encouraging."""
         }
 
 
-# Note: CRUD tools (create_todo, update_todo, list_todos) will be added
-# when we integrate with the TodoService in the supervisor node.
-# The supervisor will handle database operations directly or via a service layer.
+@tool
+async def create_todo(
+    title: str,
+    description: str | None = None,
+    priority: str = "medium",
+    estimated_duration: int | None = None,
+) -> dict[str, Any]:
+    """Create a new todo in the database.
+
+    Use this tool when the user wants to create a task or todo item.
+    This will actually save the todo to the database so the user can see it.
+
+    Args:
+        title: The title of the todo (required)
+        description: Optional detailed description
+        priority: Priority level: low, medium, high, or urgent (default: medium)
+        estimated_duration: Estimated time in minutes to complete
+
+    Returns:
+        Dictionary with the created todo's ID and details
+    """
+    # Track tool calls to detect loops
+    if not track_tool_call("create_todo"):
+        return {
+            "success": False,
+            "error": "Tool call limit exceeded",
+            "message": "This tool has been called too many times. Please review your approach.",
+        }
+
+    from ..database import get_db
+    from ..models.db_models import Priority
+    from ..services.todo_service import TodoService
+
+    logger.info(f"Creating todo: {title}")
+
+    # Map string priority to enum
+    priority_map = {
+        "low": Priority.LOW,
+        "medium": Priority.MEDIUM,
+        "high": Priority.HIGH,
+        "urgent": Priority.URGENT,
+    }
+    priority_enum = priority_map.get(priority.lower(), Priority.MEDIUM)
+
+    try:
+        async for db in get_db():
+            service = TodoService(db)
+            todo = await service.create_todo(
+                title=title,
+                description=description,
+                priority=priority_enum,
+                estimated_duration=estimated_duration,
+                ai_generated=True,
+            )
+
+            return {
+                "success": True,
+                "todo_id": todo.id,
+                "title": todo.title,
+                "status": todo.status.value,
+                "priority": todo.priority.value,
+                "message": f"Successfully created todo: {title}",
+            }
+    except Exception as e:
+        logger.error(f"Failed to create todo: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": f"Failed to create todo: {str(e)}",
+        }
+
+
+@tool
+async def create_subtasks_from_breakdown(
+    parent_title: str,
+    subtasks: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Create multiple subtasks from a task breakdown.
+
+    Use this tool after calling breakdown_task to actually create the subtasks
+    in the database as individual todos.
+
+    Args:
+        parent_title: The title of the parent task
+        subtasks: List of subtask dictionaries with 'title', 'description', and 'estimated_minutes'
+
+    Returns:
+        Dictionary with created subtask IDs and summary
+    """
+    from ..database import get_db
+    from ..models.db_models import Priority
+    from ..services.todo_service import TodoService
+
+    logger.info(f"Creating {len(subtasks)} subtasks for: {parent_title}")
+
+    try:
+        created_todos = []
+        async for db in get_db():
+            service = TodoService(db)
+
+            # Create parent todo first
+            parent = await service.create_todo(
+                title=parent_title,
+                description=f"Parent task with {len(subtasks)} subtasks",
+                priority=Priority.MEDIUM,
+                ai_generated=True,
+            )
+
+            # Create each subtask
+            for idx, subtask in enumerate(subtasks):
+                todo = await service.create_todo(
+                    title=subtask.get("title", f"Subtask {idx + 1}"),
+                    description=subtask.get("description"),
+                    estimated_duration=subtask.get("estimated_minutes"),
+                    priority=Priority.MEDIUM,
+                    parent_id=parent.id,
+                    ai_generated=True,
+                )
+                created_todos.append(
+                    {
+                        "id": todo.id,
+                        "title": todo.title,
+                        "estimated_minutes": todo.estimated_duration,
+                    }
+                )
+
+            return {
+                "success": True,
+                "parent_id": parent.id,
+                "parent_title": parent.title,
+                "subtasks_created": len(created_todos),
+                "subtasks": created_todos,
+                "message": f"Successfully created {len(created_todos)} subtasks for '{parent_title}'",
+            }
+    except Exception as e:
+        logger.error(f"Failed to create subtasks: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": f"Failed to create subtasks: {str(e)}",
+        }
